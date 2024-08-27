@@ -57,3 +57,7 @@ def update_gpt(gpt_id, name=None, api_key=None, model=None, system_message=None)
 def delete_gpt(gpt_id):
     query = "DELETE FROM gpts WHERE id = %s"
     execute_query(query, (gpt_id,))
+
+def get_gpt_config(gpt_id):
+    return execute_query("SELECT * FROM gpts WHERE id = %s", (gpt_id,), fetchone=True)
+

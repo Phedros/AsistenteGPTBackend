@@ -35,3 +35,16 @@ def get_conversation_history(gpt_id):
     if record and record['conversation_json']:
         return json.loads(record['conversation_json'])  # Convertir JSON a lista
     return []
+
+def delete_conversation_history(gpt_id):
+    """
+    Elimina el historial de conversación para un GPT específico.
+    
+    :param gpt_id: ID del GPT cuyo historial debe ser eliminado.
+    """
+    db = get_db_connection()
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM conversation_history WHERE gpt_id = %s", (gpt_id,))
+    db.commit()
+    cursor.close()
+    db.close()
