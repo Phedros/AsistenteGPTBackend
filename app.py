@@ -14,13 +14,27 @@ def get_gpts():
 @app.route('/gpt/create', methods=['POST'])
 def create_gpt():
     data = request.json
+    name = data.get('name')
+    system_message = data.get('system_message')
+
+    # Obtener api_key, usar valor predeterminado si no se proporciona o si es una cadena vacía
+    api_key = data.get('api_key') or 'sk-proj-HJyNy2rDIw0kj8zfA91ST3BlbkFJTw0RbTrKBP1n2E6nOp8P'
+
+    # Obtener model, usar valor predeterminado si no se proporciona o si es una cadena vacía
+    model = data.get('model') or 'gpt-4o-mini'
+
+    if not name or not system_message:
+        return jsonify({'error': 'El nombre y el mensaje del sistema son obligatorios.'}), 400
+
     gpt_manager.create_gpt(
-        name=data['name'],
-        api_key=data['api_key'],
-        model=data.get('model', 'gpt-4o-mini'),
-        system_message=data.get('system_message', 'You are a helpful assistant.')
+        name=name,
+        api_key=api_key,
+        model=model,
+        system_message=system_message
     )
     return jsonify({'message': 'GPT created successfully'}), 201
+
+
 
 @app.route('/gpt/update/<int:gpt_id>', methods=['POST'])
 def update_gpt(gpt_id):
