@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 import openai
 import gpt_manager
 import conversation
+from models.GPT import GPT as GPTClass
 
 app = Flask(__name__)
 
@@ -14,42 +15,31 @@ def get_gpts():
 @app.route('/gpt/create', methods=['POST'])
 def create_gpt():
     data = request.json
-    name = data.get('name')
-    system_message = data.get('system_message')
-
-    # Obtener api_key, usar valor predeterminado si no se proporciona o si es una cadena vacía
-    api_key = data.get('api_key') or 'sk-proj-HJyNy2rDIw0kj8zfA91ST3BlbkFJTw0RbTrKBP1n2E6nOp8P'
-
-    # Obtener model, usar valor predeterminado si no se proporciona o si es una cadena vacía
-    model = data.get('model') or 'gpt-4o-mini'
-
-    if not name or not system_message:
-        return jsonify({'error': 'El nombre y el mensaje del sistema son obligatorios.'}), 400
-
-    gpt_manager.create_gpt(
-        name=name,
-        api_key=api_key,
-        model=model,
-        system_message=system_message
+    gpt = GPTClass(
+        name=data.get('name'),
+        api_key=data.get('api_key') or 'sk-proj-HJyNy2rDIw0kj8zfA91ST3BlbkFJTw0RbTrKBP1n2E6nOp8P',
+        model=data.get('model') or 'gpt-4o-mini',
+        system_message=data.get('system_message')
     )
+    if not gpt.name or not gpt.system_message:
+        return jsonify({'error': 'El nombre y el mensaje del sistema son obligatorios.'}), 400
+    gpt.save()
     return jsonify({'message': 'GPT created successfully'}), 201
 
 
 
 @app.route('/gpt/update/<int:gpt_id>', methods=['POST'])
 def update_gpt(gpt_id):
+    gpt = GPTClass.get_gpt_by_id(gpt_id)
+    if not gpt:
+        return jsonify({'error': 'GPT not found'}), 404
     data = request.json
-    try:
-        gpt_manager.update_gpt(
-            gpt_id,
-            name=data.get('name'),
-            api_key=data.get('api_key'),
-            model=data.get('model'),
-            system_message=data.get('system_message')
-        )
-        return jsonify({'message': 'GPT updated successfully'}), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
+    gpt.name = data.get('name', gpt.name)
+    gpt.api_key = data.get('api_key', gpt.api_key)
+    gpt.model = data.get('model', gpt.model)
+    gpt.system_message = data.get('system_message', gpt.system_message)
+    gpt.save()
+    return jsonify({'message': 'GPT updated successfully'}), 200
 
 @app.route('/gpt/delete/<int:gpt_id>', methods=['DELETE'])
 def delete_gpt(gpt_id):
