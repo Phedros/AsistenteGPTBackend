@@ -122,40 +122,53 @@ def chat(gpt_id):
 
     # Devolver la respuesta del asistente al usuario
     return jsonify({'response': assistant_response})
-"""
-@app.route('/agent/communicate', methods=['POST'])
-def communicate_agents():
+
+# Endpoint para actualizar la configuración
+@app.route('/settings/update', methods=['POST'])
+def update_settings():
     data = request.json
-    sender_id = data.get('sender_id')
-    receiver_id = data.get('receiver_id')
-    message = data.get('message')
+    if 'api_key' in data and 'model' in data:
+        # Verifica si hay filas en la tabla
+        check_query = "SELECT COUNT(*) as count FROM settings"
+        result = gpt_manager.execute_query(check_query, fetchone=True)
+        
+        if result['count'] == 0:
+            # Inserta una nueva fila si la tabla está vacía
+            insert_query = "INSERT INTO settings (api_key, model) VALUES (%s, %s)"
+            gpt_manager.execute_query(insert_query, params=(data['api_key'], data['model']))
+        else:
+            # Si hay al menos una fila, realiza el UPDATE
+            update_query = """
+            UPDATE settings 
+            SET api_key = %s, model = %s
+            """
+            gpt_manager.execute_query(update_query, params=(data['api_key'], data['model']))
+        
+        return jsonify({'message': 'Configuración actualizada exitosamente.'}), 200
+    else:
+        return jsonify({'error': 'Faltan datos en la solicitud.'}), 400
 
-    if not all([sender_id, receiver_id, message]):
-        return jsonify({'error': 'Missing data in request.'}), 400
 
-    sender_gpt = gpt_manager.get_gpt_config(sender_id)
-    receiver_gpt = gpt_manager.get_gpt_config(receiver_id)
 
-    if not sender_gpt or not receiver_gpt:
-        return jsonify({'error': 'One or both GPTs not found.'}), 404
+# Endpoint para obtener la configuración actual
+@app.route('/settings', methods=['GET'])
+def get_settings():
+    # Consulta para obtener la configuración desde la base de datos
+    query = "SELECT api_key, model FROM settings"
+    settings = gpt_manager.execute_query(query, fetchone=True)
+    
+    if settings:
+        # Convierte los resultados de la base de datos en un diccionario
+        config = {
+            'api_key': settings['api_key'],
+            'model': settings['model']
+        }
+    else:
+        # Si no hay configuración en la base de datos, devuelve un mensaje adecuado
+        config = {'message': 'No hay configuración disponible.'}
+    
+    return jsonify(config), 200
 
-    # Aquí es donde se genera la respuesta del receptor utilizando la API de OpenAI
-    openai.api_key = receiver_gpt['api_key']
-    response = openai.ChatCompletion.create(
-        model=receiver_gpt['model'],
-        messages=[{"role": "system", "content": receiver_gpt['system_message']},
-                  {"role": "user", "content": message}],
-        max_tokens=150
-    )
-
-    # Extract the assistant's response
-    assistant_response = response['choices'][0]['message']['content'].strip()
-
-    # Podrías guardar este intercambio en la base de datos si es necesario
-    conversation.save_conversation(receiver_id, [{"role": "user", "content": message},
-                                                 {"role": "assistant", "content": assistant_response}])
-
-    return jsonify({'response': assistant_response}), 200""" 
 
 if __name__ == '__main__':
     app.run(debug=True)
