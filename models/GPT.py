@@ -1,5 +1,6 @@
+import json
+import openai
 import gpt_manager
-
 
 class GPT:
     def __init__(self, id=None, name=None, model=None, system_message=None):
@@ -18,6 +19,70 @@ class GPT:
 
     def delete(self):
         gpt_manager.delete_gpt(self.id)
+
+    @staticmethod
+    def get_gpt_by_id(gpt_id):
+        data = gpt_manager.execute_query("SELECT * FROM gpts WHERE id = %s", (gpt_id,), fetchone=True)
+        if data:
+            return GPT(data['id'], data['name'], data['model'], data['system_message'])
+        return None
+
+    def get_chat_response(self, prompt):
+        # Obtener la configuración del GPT desde la base de datos
+        settings = gpt_manager.execute_query("SELECT * FROM settings", fetchone=True)
+
+        if not settings:
+            raise ValueError("Settings not found")
+
+        # Obtener el historial de la conversación desde la base de datos
+        conversation_record = gpt_manager.execute_query(
+            "SELECT conversation_json FROM conversation_history WHERE gpt_id = %s ORDER BY created_at DESC LIMIT 1",
+            (self.id,),
+            fetchone=True
+        )
+
+        # Preparar el historial de la conversación
+        if conversation_record and conversation_record['conversation_json']:
+            try:
+                conversation_history = json.loads(conversation_record['conversation_json'])
+            except json.JSONDecodeError:
+                conversation_history = []
+        else:
+            conversation_history = []
+
+        # Agregar el nuevo mensaje del usuario al historial
+        conversation_history.append({"role": "user", "content": prompt})
+
+        # Suponiendo que ya has configurado la clave API en `settings['api_key']`
+        openai.api_key = settings['api_key']
+
+        response = openai.ChatCompletion.create(
+            model=settings['model'],
+            messages=[
+                {"role": "system", "content": self.system_message},
+                *conversation_history  # Incluir el historial completo
+            ],
+            max_tokens=150,
+            temperature=0.7,
+            top_p=1.0,
+            frequency_penalty=0.0,
+            presence_penalty=0.0
+        )
+
+        # Extraer la respuesta del asistente
+        assistant_response = response['choices'][0]['message']['content'].strip()
+
+        # Agregar la respuesta del asistente al historial
+        conversation_history.append({"role": "assistant", "content": assistant_response})
+
+        # Guardar el historial actualizado en la base de datos
+        gpt_manager.execute_query(
+            "INSERT INTO conversation_history (gpt_id, conversation_json) VALUES (%s, %s)",
+            (self.id, json.dumps(conversation_history))
+        )
+
+        return assistant_response
+
 
     @staticmethod
     def get_gpt_by_id(gpt_id):
