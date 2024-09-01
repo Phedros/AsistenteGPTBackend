@@ -9,16 +9,16 @@ app = Flask(__name__)
 
 @app.route('/gpts', methods=['GET'])
 def get_gpts():
-    gpts = gpt_manager.execute_query("SELECT id, name, api_key, model, system_message FROM gpts", fetchall=True)
+    gpts = gpt_manager.execute_query("SELECT id, name, model, system_message FROM gpts", fetchall=True)
     return jsonify(gpts), 200
 
 @app.route('/gpt/create', methods=['POST'])
 def create_gpt():
+    settings = gpt_manager.execute_query("SELECT * FROM settings", fetchone=True)
     data = request.json
     gpt = GPTClass(
         name=data.get('name'),
-        api_key=data.get('api_key') or 'sk-proj-HJyNy2rDIw0kj8zfA91ST3BlbkFJTw0RbTrKBP1n2E6nOp8P',
-        model=data.get('model') or 'gpt-4o-mini',
+        model=data.get('model') or settings['model'],
         system_message=data.get('system_message')
     )
     if not gpt.name or not gpt.system_message:
@@ -35,7 +35,6 @@ def update_gpt(gpt_id):
         return jsonify({'error': 'GPT not found'}), 404
     data = request.json
     gpt.name = data.get('name', gpt.name)
-    gpt.api_key = data.get('api_key', gpt.api_key)
     gpt.model = data.get('model', gpt.model)
     gpt.system_message = data.get('system_message', gpt.system_message)
     gpt.save()
@@ -96,7 +95,7 @@ def chat(gpt_id):
     # Agregar el nuevo mensaje del usuario al historial
     conversation_history.append({"role": "user", "content": prompt})
 
-    # Suponiendo que ya has configurado la clave API en `gpt_config['api_key']`
+    # Suponiendo que ya has configurado la clave API en `settings['api_key']`
     openai.api_key = settings['api_key']
 
     response = openai.ChatCompletion.create(

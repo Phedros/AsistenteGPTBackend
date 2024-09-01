@@ -17,15 +17,15 @@ def execute_query(query, params=(), fetchone=False, fetchall=False):
     
     return result
 
-def create_gpt(name, api_key, model, system_message):
+def create_gpt(name, model, system_message):
     query = """
-        INSERT INTO gpts (name, api_key, model, system_message)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO gpts (name, model, system_message)
+        VALUES (%s, %s, %s)
     """
-    params = (name, api_key, model, system_message)
+    params = (name, model, system_message)
     execute_query(query, params)
 
-def update_gpt(gpt_id, name=None, api_key=None, model=None, system_message=None):
+def update_gpt(gpt_id, name=None, model=None, system_message=None):
     # Verificar si el nuevo nombre ya existe en otro GPT
     if name:
         name_exists_query = "SELECT id FROM gpts WHERE name = %s AND id != %s"
@@ -39,9 +39,6 @@ def update_gpt(gpt_id, name=None, api_key=None, model=None, system_message=None)
     if name:
         updates.append("name = %s")
         params.append(name)
-    if api_key:
-        updates.append("api_key = %s")
-        params.append(api_key)
     if model:
         updates.append("model = %s")
         params.append(model)
