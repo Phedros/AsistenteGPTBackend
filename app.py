@@ -69,6 +69,10 @@ def chat(gpt_id):
 
     # Obtener la configuración del GPT desde la base de datos
     gpt_config = gpt_manager.execute_query("SELECT * FROM gpts WHERE id = %s", (gpt_id,), fetchone=True)
+    settings = gpt_manager.execute_query("SELECT * FROM settings", fetchone=True)
+
+    if not settings:
+        return jsonify({'error': 'settings not found'}), 404
 
     if not gpt_config:
         return jsonify({'error': 'GPT not found'}), 404
@@ -93,10 +97,10 @@ def chat(gpt_id):
     conversation_history.append({"role": "user", "content": prompt})
 
     # Suponiendo que ya has configurado la clave API en `gpt_config['api_key']`
-    openai.api_key = gpt_config['api_key']
+    openai.api_key = settings['api_key']
 
     response = openai.ChatCompletion.create(
-        model=gpt_config['model'],
+        model=settings['model'],
         messages=[
             {"role": "system", "content": gpt_config['system_message']},
             *conversation_history  # Incluir el historial completo
