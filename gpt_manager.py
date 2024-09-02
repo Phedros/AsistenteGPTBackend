@@ -1,21 +1,26 @@
 from config import get_db_connection
+import mysql.connector
 
 def execute_query(query, params=(), fetchone=False, fetchall=False):
-    db = get_db_connection()
-    cursor = db.cursor(dictionary=True)  # Use dictionary=True if you want dict-like cursor
-    cursor.execute(query, params)
-    
-    result = None
-    if fetchone:
-        result = cursor.fetchone()
-    elif fetchall:
-        result = cursor.fetchall()
-    
-    db.commit()
-    cursor.close()
-    db.close()
-    
-    return result
+    try:
+        db = get_db_connection()
+        cursor = db.cursor(dictionary=True)  # Use dictionary=True if you want dict-like cursor
+        cursor.execute(query, params)
+        
+        result = None
+        if fetchone:
+            result = cursor.fetchone()
+        elif fetchall:
+            result = cursor.fetchall()
+        
+        db.commit()
+        return result
+    except mysql.connector.Error as e:
+        print(f"Error al ejecutar la consulta: {e}")
+    finally:
+        cursor.close()
+        db.close()
+
 
 def create_gpt(name, model, system_message):
     query = """

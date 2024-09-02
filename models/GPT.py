@@ -1,6 +1,7 @@
 import json
 import openai
 import gpt_manager
+from conversation import save_conversation, get_conversation_history  # Importa las funciones necesarias
 
 class GPT:
     def __init__(self, id=None, name=None, model=None, system_message=None):
@@ -28,27 +29,14 @@ class GPT:
         return None
 
     def get_chat_response(self, prompt):
-        # Obtener la configuración del GPT desde la base de datos
+    # Obtener la configuración del GPT desde la base de datos
         settings = gpt_manager.execute_query("SELECT * FROM settings", fetchone=True)
 
         if not settings:
             raise ValueError("Settings not found")
 
-        # Obtener el historial de la conversación desde la base de datos
-        conversation_record = gpt_manager.execute_query(
-            "SELECT conversation_json FROM conversation_history WHERE gpt_id = %s ORDER BY created_at DESC LIMIT 1",
-            (self.id,),
-            fetchone=True
-        )
-
-        # Preparar el historial de la conversación
-        if conversation_record and conversation_record['conversation_json']:
-            try:
-                conversation_history = json.loads(conversation_record['conversation_json'])
-            except json.JSONDecodeError:
-                conversation_history = []
-        else:
-            conversation_history = []
+        # Obtener el historial de la conversación desde la base de datos utilizando la función definida
+        conversation_history = get_conversation_history(self.id)
 
         # Agregar el nuevo mensaje del usuario al historial
         conversation_history.append({"role": "user", "content": prompt})
@@ -75,11 +63,8 @@ class GPT:
         # Agregar la respuesta del asistente al historial
         conversation_history.append({"role": "assistant", "content": assistant_response})
 
-        # Guardar el historial actualizado en la base de datos
-        gpt_manager.execute_query(
-            "INSERT INTO conversation_history (gpt_id, conversation_json) VALUES (%s, %s)",
-            (self.id, json.dumps(conversation_history))
-        )
+        # Guardar el historial actualizado en la base de datos utilizando la función definida
+        save_conversation(self.id, conversation_history)
 
         return assistant_response
 
