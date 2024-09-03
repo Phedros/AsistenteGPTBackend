@@ -4,21 +4,36 @@ import mysql.connector
 
 def save_conversation(gpt_id, conversation_history):
     """
-    Guarda el historial completo de la conversación en formato JSON.
+    Guarda o actualiza el historial completo de la conversación en formato JSON.
     """
     try:
         db = get_db_connection()
         cursor = db.cursor()
-        cursor.execute("""
-            INSERT INTO conversation_history (gpt_id, conversation_json)
-            VALUES (%s, %s)
-        """, (gpt_id, json.dumps(conversation_history)))  # Convertir la lista a JSON
+        # Verificar si ya existe un historial para el gpt_id
+        cursor.execute("SELECT COUNT(*) FROM conversation_history WHERE gpt_id = %s", (gpt_id,))
+        count = cursor.fetchone()[0]
+
+        if count > 0:
+            # Si existe, actualizar el historial existente
+            cursor.execute("""
+                UPDATE conversation_history
+                SET conversation_json = %s
+                WHERE gpt_id = %s
+            """, (json.dumps(conversation_history), gpt_id))
+        else:
+            # Si no existe, insertar un nuevo historial
+            cursor.execute("""
+                INSERT INTO conversation_history (gpt_id, conversation_json)
+                VALUES (%s, %s)
+            """, (gpt_id, json.dumps(conversation_history)))
+
         db.commit()
     except mysql.connector.Error as e:
         print(f"Error al guardar la conversación: {e}")
     finally:
         cursor.close()
         db.close()
+
 
 def get_conversation_history(gpt_id):
     """

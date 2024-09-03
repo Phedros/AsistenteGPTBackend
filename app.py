@@ -4,6 +4,7 @@ import openai
 import gpt_manager
 import conversation
 from models.GPT import GPT as GPTClass
+from models.flujo import Flujo
 
 app = Flask(__name__)
 
@@ -123,6 +124,45 @@ def get_settings():
         config = {'message': 'No hay configuración disponible.'}
     
     return jsonify(config), 200
+
+@app.route('/flujo/create', methods=['POST'])
+def create_flujo():
+    data = request.json
+    nombre_flujo = data.get('nombre')
+    agentes = data.get('agentes')  # Lista de diccionarios con gpt_id, orden y prompt_entrada
+    
+    if not nombre_flujo or not agentes:
+        return jsonify({'error': 'El nombre del flujo y la lista de agentes son obligatorios.'}), 400
+
+    try:
+        flujo_id = Flujo.crear_flujo(nombre_flujo, agentes)
+        return jsonify({'message': 'Flujo creado exitosamente', 'flujo_id': flujo_id}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/flujo/run/<int:flujo_id>', methods=['POST'])
+def run_flujo(flujo_id):
+    flujo = Flujo.obtener_flujo_por_id(flujo_id)
+    if not flujo:
+        return jsonify({'error': 'Flujo no encontrado.'}), 404
+
+    prompt_usuario = request.json.get('prompt')
+    respuesta_anterior = None
+    resultados = []
+
+    for agente in flujo.agentes:
+        prompt_entrada = flujo.obtener_prompt_entrada(agente['orden'], respuesta_anterior, prompt_usuario)
+        
+        gpt = GPTClass.get_gpt_by_id(agente['gpt_id'])
+        if not gpt:
+            return jsonify({'error': f'Agente con ID {agente["gpt_id"]} no encontrado.'}), 404
+        
+        response = gpt.get_chat_response(prompt_entrada)
+        resultados.append({'gpt_id': agente['gpt_id'], 'response': response})
+        
+        respuesta_anterior = response
+
+    return jsonify({'resultados': resultados}), 200
 
 
 if __name__ == '__main__':
