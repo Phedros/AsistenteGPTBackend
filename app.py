@@ -46,12 +46,13 @@ def delete_gpt(gpt_id):
     gpt_manager.delete_gpt(gpt_id)
     return jsonify({'message': 'GPT deleted successfully'}), 200
 
-@app.route('/gpt/history/<int:gpt_id>', methods=['GET'])
-def get_history(gpt_id):
-    history = conversation.get_conversation_history(gpt_id)
+@app.route('/gpt/history/<int:gpt_id>/<int:conversation_id>', methods=['GET'])
+def get_history(gpt_id, conversation_id):
+    history = conversation.get_conversation_history(conversation_id)
     if history is None:
-        return jsonify({'error': 'No history found for the specified GPT.'}), 404
+        return jsonify({'error': 'No history found for the specified conversation.'}), 404
     return jsonify(history), 200
+
 
 # Nueva ruta para borrar el historial de un GPT específico
 @app.route('/gpt/history/delete/<int:gpt_id>', methods=['DELETE'])
@@ -62,8 +63,8 @@ def delete_history(gpt_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/gpt/chat/<int:gpt_id>', methods=['POST'])
-def chat(gpt_id):
+@app.route('/gpt/chat/<int:gpt_id>/<int:conversation_id>', methods=['POST'])
+def chat(gpt_id, conversation_id):
     prompt = request.json.get('prompt')
 
     # Obtener el objeto GPT desde la base de datos
@@ -73,10 +74,11 @@ def chat(gpt_id):
 
     try:
         # Usar el método de la clase GPT para obtener la respuesta del chat
-        response = gpt.get_chat_response(prompt)
+        response = gpt.get_chat_response(prompt, conversation_id)
         return jsonify({'response': response}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 
 # Endpoint para actualizar la configuración
@@ -163,6 +165,60 @@ def run_flujo(flujo_id):
         respuesta_anterior = response
 
     return jsonify({'resultados': resultados}), 200
+
+@app.route('/gpt/conversation/create/<int:gpt_id>', methods=['POST'])
+def create_conversation(gpt_id):
+    """
+    Endpoint para crear una nueva conversación para un GPT específico.
+    
+    :param gpt_id: ID del GPT para el cual se crea la conversación.
+    :return: ID de la nueva conversación.
+    """
+    try:
+        # Crear una nueva conversación y obtener su ID
+        conversation_id = conversation.create_conversation(gpt_id)
+        
+        if conversation_id is not None:
+            return jsonify({'message': 'Conversación creada exitosamente', 'conversation_id': conversation_id}), 201
+        else:
+            return jsonify({'error': 'Error al crear la conversación'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/gpt/conversations/<int:gpt_id>', methods=['GET'])
+def get_conversations(gpt_id):
+    """
+    Endpoint para obtener todas las conversaciones de un GPT específico.
+    
+    :param gpt_id: ID del GPT para el cual se obtienen las conversaciones.
+    :return: Lista de conversaciones con sus IDs.
+    """
+    try:
+        conversations = conversation.get_all_conversations(gpt_id)
+        return jsonify(conversations), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/gpt/conversation/delete/<int:gpt_id>/<int:conversation_id>', methods=['DELETE'])
+def delete_conversation(gpt_id, conversation_id):
+    """
+    Endpoint para eliminar una conversación específica de un GPT.
+    
+    :param gpt_id: ID del GPT al que pertenece la conversación.
+    :param conversation_id: ID de la conversación a eliminar.
+    :return: Mensaje de éxito o error.
+    """
+    try:
+        # Verifica si la conversación existe para el GPT específico
+        conversations = conversation.get_all_conversations(gpt_id)
+        if any(conv['id'] == conversation_id for conv in conversations):
+            # Si la conversación existe, procedemos a eliminarla
+            conversation.delete_conversation_history(conversation_id)
+            return jsonify({'message': 'Conversación eliminada exitosamente'}), 200
+        else:
+            return jsonify({'error': 'Conversación no encontrada para el GPT especificado.'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

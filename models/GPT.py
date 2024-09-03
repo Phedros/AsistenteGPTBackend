@@ -28,20 +28,20 @@ class GPT:
             return GPT(data['id'], data['name'], data['model'], data['system_message'])
         return None
 
-    def get_chat_response(self, prompt):
-    # Obtener la configuración del GPT desde la base de datos
+    def get_chat_response(self, prompt, conversation_id):
+        # Obtener la configuración del GPT desde la base de datos
         settings = gpt_manager.execute_query("SELECT * FROM settings", fetchone=True)
 
         if not settings:
             raise ValueError("Settings not found")
 
-        # Obtener el historial de la conversación desde la base de datos utilizando la función definida
-        conversation_history = get_conversation_history(self.id)
+        # Obtener el historial de la conversación desde la base de datos utilizando el conversation_id
+        conversation_history = get_conversation_history(conversation_id)
 
         # Agregar el nuevo mensaje del usuario al historial
         conversation_history.append({"role": "user", "content": prompt})
 
-        # Suponiendo que ya has configurado la clave API en `settings['api_key']`
+        # Configurar la API de OpenAI
         openai.api_key = settings['api_key']
 
         response = openai.ChatCompletion.create(
@@ -63,10 +63,11 @@ class GPT:
         # Agregar la respuesta del asistente al historial
         conversation_history.append({"role": "assistant", "content": assistant_response})
 
-        # Guardar el historial actualizado en la base de datos utilizando la función definida
-        save_conversation(self.id, conversation_history)
+        # Guardar el historial actualizado en la base de datos
+        save_conversation(conversation_id, conversation_history)
 
         return assistant_response
+
 
 
     @staticmethod
