@@ -21,6 +21,26 @@ def execute_query(query, params=(), fetchone=False, fetchall=False):
         cursor.close()
         db.close()
 
+def fetch_query(query, params=(), fetchone=False, fetchall=False):
+    try:
+        db = get_db_connection()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute(query, params)
+
+        result = None
+        if fetchone:
+            result = cursor.fetchone()
+        elif fetchall:
+            result = cursor.fetchall()
+
+        return result
+    except mysql.connector.Error as e:
+        print(f"Error al ejecutar la consulta: {e}")
+    finally:
+        cursor.close()
+        db.close()
+
+
 
 def create_gpt(name, model, system_message):
     query = """

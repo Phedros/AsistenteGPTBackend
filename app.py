@@ -142,29 +142,119 @@ def create_flujo():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-@app.route('/flujo/run/<int:flujo_id>', methods=['POST'])
-def run_flujo(flujo_id):
+@app.route('/flujo/run/<int:flujo_id>/<int:conversation_id>', methods=['POST'])
+def run_flujo(flujo_id, conversation_id):
     flujo = Flujo.obtener_flujo_por_id(flujo_id)
     if not flujo:
         return jsonify({'error': 'Flujo no encontrado.'}), 404
 
     prompt_usuario = request.json.get('prompt')
-    respuesta_anterior = None
-    resultados = []
+    historial_conversacion = []
+    respuestas_anteriores = {}
 
     for agente in flujo.agentes:
-        prompt_entrada = flujo.obtener_prompt_entrada(agente['orden'], respuesta_anterior, prompt_usuario)
-        
+        tipo_prompt = agente.get('tipo_prompt')
+
+        if tipo_prompt == 'usuario':
+            prompt_entrada = prompt_usuario
+        elif tipo_prompt == 'respuesta_anterior':
+            referencia = agente.get('referencias_respuestas', [])[0]
+            prompt_entrada = respuestas_anteriores.get(referencia)
+        elif tipo_prompt == 'combinado':
+            prompt_entrada = ""
+            # Combinar todas las respuestas referenciadas
+            for referencia in agente.get('referencias_respuestas', []):
+                if referencia in respuestas_anteriores:
+                    prompt_entrada += f"* {respuestas_anteriores[referencia]} \n\n"
+
+            # Incluir el prompt del usuario si está especificado
+            if agente.get('incluir_prompt_usuario', False):
+                prompt_entrada = f"{prompt_usuario} \n\n {prompt_entrada}"
+        else:  # 'system' or any other case
+            prompt_entrada = agente.get('system', '')
+
         gpt = GPTClass.get_gpt_by_id(agente['gpt_id'])
         if not gpt:
             return jsonify({'error': f'Agente con ID {agente["gpt_id"]} no encontrado.'}), 404
-        
-        response = gpt.get_chat_response(prompt_entrada)
-        resultados.append({'gpt_id': agente['gpt_id'], 'response': response})
-        
-        respuesta_anterior = response
 
-    return jsonify({'resultados': resultados}), 200
+        response = gpt.get_chat_response(prompt_entrada, conversation_id, flujo_id)
+
+        # Guardar la respuesta del agente para posibles referencias futuras
+        respuestas_anteriores[agente['orden']] = response
+
+        # Añadir al historial la iteración del agente
+        historial_conversacion.append({
+            "agent_name": gpt.name,
+            "position": agente['orden'],
+            "response": response
+        })
+
+    # Guardar todo el historial del flujo en una sola fila
+    conversation.save_flujo_conversation(flujo_id, historial_conversacion)
+
+    return jsonify({'resultados': historial_conversacion}), 200
+
+
+@app.route('/flujo/eliminar/<int:flujo_id>', methods=['DELETE'])
+def eliminar_flujo(flujo_id):
+    """
+    Endpoint para eliminar un flujo por su ID.
+    
+    :param flujo_id: ID del flujo a eliminar.
+    :return: JSON con el resultado de la operación.
+    """
+    exito = Flujo.eliminar_flujo(flujo_id)
+    
+    if exito:
+        return jsonify({'mensaje': 'Flujo eliminado con éxito.'}), 200
+    else:
+        return jsonify({'error': 'No se pudo eliminar el flujo.'}), 500
+
+
+@app.route('/flujo/conversation/create/<int:flujo_id>', methods=['POST'])
+def create_flujo_conversation(flujo_id):
+    """
+    Crea una nueva conversación para un flujo específico.
+    
+    :param flujo_id: ID del flujo para el cual se crea la conversación.
+    :return: ID de la nueva conversación en el contexto del flujo.
+    """
+    try:
+        # Verificar que el flujo exista
+        flujo = Flujo.obtener_flujo_por_id(flujo_id)
+        if not flujo:
+            return jsonify({'error': 'Flujo no encontrado.'}), 404
+        
+        # Crear una entrada en flujo_conversation_history con un JSON vacío
+        empty_history = json.dumps([])  # Iniciar con una lista vacía para el historial
+        flujo_conversation_id = Flujo.crear_conversacion_flujo(flujo_id, empty_history)
+
+        return jsonify({'message': 'Conversación creada exitosamente en el flujo', 'conversation_id': flujo_conversation_id}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/flujo/conversation/delete/<int:flujo_conversation_id>', methods=['DELETE'])
+def delete_flujo_conversation(flujo_conversation_id):
+    """
+    Elimina una conversación específica de un flujo.
+    
+    :param flujo_conversation_id: ID de la conversación del flujo a eliminar.
+    :return: Mensaje de éxito o error.
+    """
+    try:
+        # Verificar que la conversación exista
+        if not Flujo.conversacion_existe(flujo_conversation_id):
+            return jsonify({'error': 'Conversación de flujo no encontrada.'}), 404
+        
+        # Eliminar la conversación del flujo
+        eliminado = Flujo.eliminar_conversacion_flujo(flujo_conversation_id)
+        if eliminado:
+            return jsonify({'message': 'Conversación del flujo eliminada exitosamente.'}), 200
+        else:
+            return jsonify({'error': 'No se pudo eliminar la conversación del flujo.'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/gpt/conversation/create/<int:gpt_id>', methods=['POST'])
 def create_conversation(gpt_id):

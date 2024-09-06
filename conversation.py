@@ -130,5 +130,42 @@ def get_all_conversations(gpt_id):
 
     return [{'id': record['id']} for record in records]
 
+def save_flujo_conversation(flujo_id, conversation_history):
+    """
+    Guarda o actualiza el historial completo de un flujo multiagente en formato JSON usando el ID del flujo.
+    
+    :param flujo_id: ID del flujo para el cual se guarda la conversación.
+    :param conversation_history: Historial completo de la conversación del flujo.
+    """
+    try:
+        db = get_db_connection()
+        cursor = db.cursor()
+
+        # Verificar si ya existe un historial para el flujo_id
+        cursor.execute("SELECT COUNT(*) FROM flujo_conversation_history WHERE flujo_id = %s", (flujo_id,))
+        count = cursor.fetchone()[0]
+
+        if count > 0:
+            # Si existe, actualizar el historial existente
+            cursor.execute("""
+                UPDATE flujo_conversation_history
+                SET conversation_json = %s
+                WHERE flujo_id = %s
+            """, (json.dumps(conversation_history), flujo_id))
+        else:
+            # Si no existe, insertar un nuevo historial
+            cursor.execute("""
+                INSERT INTO flujo_conversation_history (flujo_id, conversation_json)
+                VALUES (%s, %s)
+            """, (flujo_id, json.dumps(conversation_history)))
+
+        db.commit()
+    except mysql.connector.Error as e:
+        print(f"Error al guardar la conversación del flujo: {e}")
+    finally:
+        cursor.close()
+        db.close()
+
+
 
 
