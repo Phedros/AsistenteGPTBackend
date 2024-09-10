@@ -46,7 +46,7 @@ class GPT:
 
         # Historial de conversación será manejado diferentemente si estamos en un flujo
         if flujo_id:
-            conversation = []
+            #conversation = []
             # Obtener el historial del flujo desde la base de datos utilizando el flujo_id
             conversation_history = Flujo.obtener_historial_flujo(conversation_id)
         else:
@@ -55,7 +55,7 @@ class GPT:
 
         # Agregar el nuevo mensaje del usuario al historial
         conversation_history.append({"role": "user", "content": prompt})
-        conversation.append({"role": "user", "content": prompt})
+        #conversation.append({"role": "user", "content": prompt})
 
         # Configurar la API de OpenAI
         openai.api_key = settings['api_key']
@@ -66,7 +66,7 @@ class GPT:
                 {"role": "system", "content": self.system_message},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=500,
+            #max_tokens=500,
             temperature=0.7,
             top_p=1.0,
             frequency_penalty=0.0,

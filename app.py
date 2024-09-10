@@ -194,6 +194,33 @@ def run_flujo(flujo_id, conversation_id):
 
     return jsonify({'resultados': historial_conversacion}), 200
 
+@app.route('/flujo/history/<int:flujo_id>/<int:conversation_id>', methods=['GET'])
+def get_flujo_conversation_history(flujo_id, conversation_id):
+    """
+    Devuelve el historial de una conversación específica de un flujo.
+    
+    :param flujo_id: ID del flujo al que pertenece la conversación.
+    :param conversation_id: ID de la conversación para la cual se obtiene el historial.
+    :return: Historial de la conversación.
+    """
+    try:
+        # Verifica que el flujo exista
+        flujo = Flujo.obtener_flujo_por_id(flujo_id)
+        if not flujo:
+            return jsonify({'error': 'Flujo no encontrado.'}), 404
+        
+        # Obtener el historial de la conversación específica
+        historial = Flujo.obtener_historial_conversacion(flujo_id, conversation_id)
+        if historial:
+            return jsonify(historial), 200
+        else:
+            # Retornar un historial vacío o un mensaje indicando que no hay historial
+            return jsonify({'mensaje': 'No hay historial para esta conversación.', 'historial': []}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
 
 @app.route('/flujo/eliminar/<int:flujo_id>', methods=['DELETE'])
 def eliminar_flujo(flujo_id):
@@ -309,6 +336,66 @@ def delete_conversation(gpt_id, conversation_id):
             return jsonify({'error': 'Conversación no encontrada para el GPT especificado.'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/flujo/prompt-options', methods=['GET'])
+def get_prompt_options():
+    """
+    Devuelve las opciones disponibles para el prompt de entrada en un flujo.
+    """
+    prompt_options = [
+        {"value": "usuario", "label": "Prompt Directo del Usuario"},
+        {"value": "respuesta_anterior", "label": "Respuesta de Agente anterior"},
+        {"value": "combinado", "label": "Combinación de Respuestas"},
+        {"value": "prompt_directo", "label": "Sin Prompt (Usar System del Agente)"}
+    ]
+    
+    return jsonify(prompt_options), 200
+
+@app.route('/flujo/<int:flujo_id>/agentes', methods=['GET'])
+def get_flujo_agentes(flujo_id):
+    """
+    Devuelve los agentes de un flujo específico.
+    """
+    try:
+        agentes = Flujo.obtener_agentes_por_flujo(flujo_id)
+        if agentes:
+            return jsonify(agentes), 200
+        else:
+            return jsonify({'error': 'No se encontraron agentes para el flujo proporcionado.'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+
+@app.route('/flujo/<int:flujo_id>/conversaciones', methods=['GET'])
+def get_flujo_conversations(flujo_id):
+    """
+    Devuelve todas las conversaciones asociadas a un flujo específico.
+    """
+    try:
+        conversaciones = Flujo.obtener_conversaciones_por_flujo(flujo_id)
+        # Devolver lista vacía si no hay conversaciones
+        if conversaciones:
+            return jsonify(conversaciones), 200
+        else:
+            return jsonify([]), 200  # Responder con lista vacía en lugar de error 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/flujo', methods=['GET'])
+def get_flujos():
+    """
+    Devuelve todos los flujos disponibles.
+    """
+    try:
+        flujos = Flujo.obtener_todos_flujos()
+        if flujos:
+            return jsonify(flujos), 200
+        else:
+            return jsonify([]), 200  # Devuelve un array vacío en vez de un error
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 
 if __name__ == '__main__':

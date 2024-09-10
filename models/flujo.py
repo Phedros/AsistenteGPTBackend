@@ -259,3 +259,74 @@ class Flujo:
         
         gpt_manager.execute_query(query, params)
 
+    @staticmethod
+    def obtener_agentes_por_flujo(flujo_id):
+        """
+        Obtiene todos los agentes de un flujo por su ID.
+        """
+        query = """
+            SELECT gpt_id, orden, prompt_entrada, tipo_prompt 
+            FROM Flujo_Agentes 
+            WHERE flujo_id = %s 
+            ORDER BY orden
+        """
+        params = (flujo_id,)
+        return gpt_manager.execute_query(query, params, fetchall=True)
+    
+    @staticmethod
+    def obtener_todos_flujos():
+        """
+        Obtiene todos los flujos de la base de datos.
+        """
+        query = "SELECT id, nombre FROM Flujos"
+        flujos = gpt_manager.execute_query(query, fetchall=True)
+        return flujos
+    
+    @staticmethod
+    def obtener_conversaciones_por_flujo(flujo_id):
+        """
+        Obtiene todas las conversaciones asociadas a un flujo específico por su ID.
+        
+        :param flujo_id: ID del flujo para el cual se quieren obtener las conversaciones.
+        :return: Lista de conversaciones en formato de diccionarios.
+        """
+        query = """
+            SELECT id, conversation_json 
+            FROM flujo_conversation_history 
+            WHERE flujo_id = %s
+        """
+        params = (flujo_id,)
+        conversaciones = gpt_manager.execute_query(query, params, fetchall=True)
+        
+        # Devolver las conversaciones en un formato más amigable (sin el JSON crudo)
+        conversaciones_format = [
+            {
+                "id": conversacion['id'],
+                "conversation": json.loads(conversacion['conversation_json']) if conversacion['conversation_json'] else []
+            }
+            for conversacion in conversaciones
+        ]
+        
+        return conversaciones_format
+
+    @staticmethod
+    def obtener_historial_conversacion(flujo_id, conversation_id):
+        """
+        Obtiene el historial de conversación de un flujo específico.
+        
+        :param flujo_id: ID del flujo.
+        :param conversation_id: ID de la conversación dentro del flujo.
+        :return: Historial de conversación como lista de diccionarios.
+        """
+        query = """
+            SELECT conversation_json 
+            FROM flujo_conversation_history 
+            WHERE flujo_id = %s AND id = %s
+        """
+        params = (flujo_id, conversation_id)
+        result = gpt_manager.execute_query(query, params, fetchone=True)
+        
+        if result and result['conversation_json']:
+            return json.loads(result['conversation_json'])  # Convertir JSON a lista de diccionarios
+        
+        return []
